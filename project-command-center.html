@@ -108,6 +108,15 @@ nav{
 .efill{height:100%;background:linear-gradient(90deg,var(--accent3),var(--accent));transition:width .15s;border-radius:4px;}
 .emarks{display:flex;justify-content:space-between;font-family:var(--mono);font-size:0.62rem;color:var(--dim);}
 
+.nav-btn{
+  font-family:var(--mono);font-size:var(--fs-xs);letter-spacing:0.08em;
+  padding:0 0.75rem;height:var(--touch-sm);
+  background:var(--surface2);border:1px solid var(--border);color:var(--dim);
+  cursor:pointer;border-radius:4px;transition:all .15s;
+  display:flex;align-items:center;
+}
+.nav-btn:active{border-color:var(--accent);color:var(--accent);}
+
 /* Help toggle */
 .help-row{
   display:flex;align-items:center;gap:12px;
@@ -399,6 +408,9 @@ nav{
     <button class="ntab" onclick="showPage('schedule',this)">Schedule</button>
   </div>
   <div class="nav-right">
+    <button class="nav-btn" onclick="exportData()" title="Export backup">↑ Export</button>
+    <button class="nav-btn" onclick="document.getElementById('importFile').click()" title="Import backup">↓ Import</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
     <div class="tod" id="tod">MORNING</div>
     <div class="clock" id="clk">--:--:--</div>
   </div>
@@ -1080,6 +1092,34 @@ function renderUpcoming(){
   }).join('');
 }
 function deleteBlock(id){if(!confirm('Remove this time block?'))return;blocks=blocks.filter(x=>x.id!==id);save();renderSchedule();}
+
+// ── EXPORT / IMPORT ───────────────────────────────────────────────────
+function exportData(){
+  const data={version:1,exportedAt:new Date().toISOString(),projects,blocks,cond};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='command-center-'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function importData(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const d=JSON.parse(e.target.result);
+      if(!Array.isArray(d.projects)||!Array.isArray(d.blocks))throw new Error('Invalid backup file');
+      if(!confirm('Import '+d.projects.length+' projects and '+d.blocks.length+' time blocks?\n\nThis will REPLACE all current data.'))return;
+      projects=d.projects;blocks=d.blocks;if(d.cond)cond=d.cond;
+      save();renderProjects();renderSchedule();
+      alert('Import successful!');
+    }catch(err){alert('Could not read backup file: '+err.message);}
+  };
+  reader.readAsText(file);
+  input.value='';
+}
 
 // ── MODALS ────────────────────────────────────────────────────────────
 function closeModal(id){document.getElementById(id).classList.remove('open');}

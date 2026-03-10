@@ -1,4 +1,4 @@
-const CACHE = 'command-center-v1';
+const CACHE = 'command-center-v2';
 const ASSETS = [
   './project-command-center.html',
   './manifest-cc.json',
