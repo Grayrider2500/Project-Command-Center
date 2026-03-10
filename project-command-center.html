@@ -513,6 +513,8 @@ nav{
       </div>
     </div>
     <button class="add-block-btn" onclick="openBlockModal()">＋ Add Time Block</button>
+    <button class="add-block-btn" style="border-color:var(--accent2);color:var(--accent2)" onclick="document.getElementById('icsFile').click()">↓ Import Calendar (.ics)</button>
+    <input type="file" id="icsFile" accept=".ics,.ical" style="display:none" onchange="importICS(this)">
     <div>
       <div class="slbl">Upcoming</div>
       <div class="up-list" id="uplist"><div style="color:var(--dim);font-family:var(--sans);font-size:var(--fs-sm)">No upcoming blocks</div></div>
@@ -1116,6 +1118,72 @@ function importData(input){
       save();renderProjects();renderSchedule();
       alert('Import successful!');
     }catch(err){alert('Could not read backup file: '+err.message);}
+  };
+  reader.readAsText(file);
+  input.value='';
+}
+
+// ── ICS IMPORT ────────────────────────────────────────────────────────
+function parseICSDate(str){
+  // Remove VALUE=DATE-TIME: prefix variants
+  const s=str.replace(/^[^:]+:/,'').trim();
+  const d=s.replace('Z','');
+  const yr=+d.slice(0,4),mo=+d.slice(4,6)-1,dy=+d.slice(6,8);
+  if(d.length===8) return null; // all-day, skip
+  const hr=+d.slice(9,11),mn=+d.slice(11,13),sc=+d.slice(13,15);
+  return s.endsWith('Z')
+    ? new Date(Date.UTC(yr,mo,dy,hr,mn,sc))
+    : new Date(yr,mo,dy,hr,mn,sc);
+}
+function importICS(input){
+  const file=input.files[0]; if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    // Unfold RFC 5545 line continuations (CRLF + space or tab)
+    const raw=e.target.result.replace(/\r\n[ \t]/g,'').replace(/\r/g,'');
+    const lines=raw.split('\n');
+    const events=[];
+    let ev=null;
+    for(const line of lines){
+      if(line==='BEGIN:VEVENT'){ev={};continue;}
+      if(line==='END:VEVENT'){if(ev)events.push(ev);ev=null;continue;}
+      if(!ev)continue;
+      const colon=line.indexOf(':');
+      if(colon<0)continue;
+      const key=line.slice(0,colon).split(';')[0].toUpperCase();
+      const val=line.slice(colon+1).trim();
+      if(key==='DTSTART')ev.start=val;
+      else if(key==='DTEND')ev.end=val;
+      else if(key==='SUMMARY')ev.summary=val;
+      else if(key==='DESCRIPTION')ev.desc=val.replace(/\\n/g,' ').replace(/\\,/g,',');
+      else if(key==='LOCATION')ev.loc=val.replace(/\\,/g,',');
+    }
+    let added=0,skipped=0;
+    const newBlocks=[];
+    for(const ev of events){
+      if(!ev.start||!ev.summary)continue;
+      const start=parseICSDate(ev.start);
+      if(!start){skipped++;continue;} // all-day
+      const end=ev.end?parseICSDate(ev.end):null;
+      const pad=n=>String(n).padStart(2,'0');
+      const dateStr=`${start.getFullYear()}-${pad(start.getMonth()+1)}-${pad(start.getDate())}`;
+      const startTime=`${pad(start.getHours())}:${pad(start.getMinutes())}`;
+      const endTime=end?`${pad(end.getHours())}:${pad(end.getMinutes())}`:'';
+      const notes=[ev.desc,ev.loc?'📍 '+ev.loc:''].filter(Boolean).join(' | ');
+      newBlocks.push({
+        id:crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2),
+        date:dateStr,startTime,endTime,
+        label:ev.summary,
+        projectId:'',
+        notes
+      });
+      added++;
+    }
+    if(added===0){alert('No timed events found in this file.'+(skipped?' ('+skipped+' all-day events skipped.)':''));input.value='';return;}
+    if(!confirm('Add '+added+' calendar event'+(added>1?'s':'')+' as time blocks?'+(skipped?' ('+skipped+' all-day events skipped)':'')))return;
+    blocks.push(...newBlocks);
+    save();renderSchedule();
+    alert(added+' event'+(added>1?'s':'')+' imported.');
   };
   reader.readAsText(file);
   input.value='';
