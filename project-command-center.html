@@ -681,6 +681,7 @@ nav{
         <div class="ro on" onclick="setRecur('none',this)">None</div>
         <div class="ro" onclick="setRecur('daily',this)">Daily</div>
         <div class="ro" onclick="setRecur('weekly',this)">Weekly</div>
+        <div class="ro" onclick="setRecur('biweekly',this)">Biweekly</div>
         <div class="ro" onclick="setRecur('weekdays',this)">Weekdays</div>
         <div class="ro" onclick="setRecur('custom',this)">Custom</div>
       </div>
@@ -1026,6 +1027,13 @@ function blocksForDate(ds){
     if(b.recur==='none')return b.date===ds;
     if(b.recur==='daily')return true;
     if(b.recur==='weekly')return new Date(b.date+'T12:00:00').getDay()===dow;
+    if(b.recur==='biweekly'){
+      const start=new Date(b.date+'T12:00:00');
+      const target=new Date(ds+'T12:00:00');
+      if(target<start) return false;
+      const diffDays=Math.floor((target-start)/(1000*60*60*24));
+      return diffDays%14===0;
+    }
     if(b.recur==='weekdays')return dow>=1&&dow<=5;
     if(b.recur==='custom')return(b.dows||[]).includes(dow);
     return false;
