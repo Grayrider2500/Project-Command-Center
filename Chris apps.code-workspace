@@ -5,9 +5,12 @@
 		},
 		{
 			"path": "."
+		},
+		{
+			"path": "../Tool Inventory"
 		}
 	],
 	"settings": {
-		"liveServer.settings.multiRootWorkspaceName": "project-command-center"
+		"liveServer.settings.multiRootWorkspaceName": "Tool Inventory"
 	}
 }
