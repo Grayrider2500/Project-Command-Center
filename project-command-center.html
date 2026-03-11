@@ -944,7 +944,7 @@ function renderTaskList(){
       <div class="ttxt">${t.text}</div>
       <span class="ttag ${t.time||'anytime'}">${t.time||'anytime'}</span>
       <button class="tdel" onclick="removeTask(${i})">✕</button>
-    </div>`).join('')||'<div style="color:var(--dim);font-size:var(--fs-sm);padding:0.5rem">No tasks yet — add steps below to track small wins</div>';
+    </div>`).join('')||'<div style="color:var(--dim);font-family:var(--sans);font-size:var(--fs-sm);padding:0.5rem">No tasks yet — add steps below to track small wins</div>';
 }
 function addTask(){
   const p=projects.find(x=>x.id===detailProjId);if(!p)return;
