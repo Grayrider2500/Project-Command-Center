@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "../ClaudeCodeTest"
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "project-command-center"
+	}
+}

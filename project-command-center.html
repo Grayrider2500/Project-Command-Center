@@ -488,11 +488,11 @@ nav{
   <aside class="ssidebar">
   <div class="ssb-inner">
     <div>
-      <div class="slbl">Week</div>
+      <div class="slbl">Month</div>
       <div class="wnav">
-        <button class="wbtn" onclick="shiftWeek(-1)">‹</button>
+        <button class="wbtn" onclick="shiftMonth(-1)">‹</button>
         <div class="wtitle" id="wtitle">—</div>
-        <button class="wbtn" onclick="shiftWeek(1)">›</button>
+        <button class="wbtn" onclick="shiftMonth(1)">›</button>
       </div>
     </div>
     <div>
@@ -510,9 +510,11 @@ nav{
         <div class="leg-item"><div class="leg-dot" style="background:#f97316"></div>Meal Prep</div>
         <div class="leg-item"><div class="leg-dot" style="background:#e879f9"></div>Grocery / Errands</div>
         <div class="leg-item"><div class="leg-dot" style="background:#94a3b8"></div>Personal</div>
+        <div class="leg-item"><div class="leg-dot" style="background:#4ecdc4"></div>Work Period</div>
       </div>
     </div>
     <button class="add-block-btn" onclick="openBlockModal()">＋ Add Time Block</button>
+    <button class="add-block-btn" style="border-color:var(--accent3);color:var(--accent3)" onclick="openBlockModal(); document.getElementById('bm-type').value='workperiod'">＋ Work Period</button>
     <button class="add-block-btn" style="border-color:var(--accent2);color:var(--accent2)" onclick="document.getElementById('icsFile').click()">↓ Import Calendar (.ics)</button>
     <input type="file" id="icsFile" accept=".ics,.ical" style="display:none" onchange="importICS(this)">
     <div>
@@ -640,6 +642,7 @@ nav{
   <div class="mftr">
     <button class="btn danger" onclick="deleteProject()">Delete</button>
     <button class="btn" onclick="editProject()">Edit</button>
+    <button class="btn pri" onclick="scheduleProject()">Schedule</button>
     <button class="btn pri" onclick="closeModal('detailOverlay')">Close</button>
   </div>
 </div>
@@ -662,6 +665,7 @@ nav{
           <option value="mealprep">Meal Prep</option>
           <option value="grocery">Grocery / Errands</option>
           <option value="personal">Personal</option>
+          <option value="workperiod">Work Period</option>
         </select>
       </div>
       <div class="fg"><span class="flbl">Date</span><input type="date" class="finput" id="bm-date"></div>
@@ -709,7 +713,7 @@ let blocks=JSON.parse(localStorage.getItem(BK)||'[]');
 let cond=JSON.parse(localStorage.getItem(CK)||JSON.stringify({weather:false,outdoor:false,body:'good',time:'plenty',help:false,energy:75}));
 let curView='priority',editProjId=null,detailProjId=null,editBlockId=null;
 let bRecur='none',bDows=[];
-let viewDate=new Date(),weekOff=0;
+let viewDate=new Date(),weekOff=0,monthOff=0;
 function save(){localStorage.setItem(PK,JSON.stringify(projects));localStorage.setItem(BK,JSON.stringify(blocks));localStorage.setItem(CK,JSON.stringify(cond));}
 
 // ── CLOCK ─────────────────────────────────────────────────────────────
@@ -961,14 +965,32 @@ function removeTask(i){const p=projects.find(x=>x.id===detailProjId);if(!p)retur
 function deleteProject(){if(!confirm('Delete this project permanently?'))return;projects=projects.filter(x=>x.id!==detailProjId);save();closeModal('detailOverlay');renderProjects();}
 function editProject(){closeModal('detailOverlay');openProjModal(detailProjId);}
 
-// ── BLOCKS ────────────────────────────────────────────────────────────
-const bColors={routine:'#4a9eff',medical:'#e8a020',amish:'#3ecf8e',social:'#a78bfa',travel:'#e05252',mealprep:'#f97316',grocery:'#e879f9',personal:'#94a3b8'};
+function scheduleProject(){
+  // open schedule page and launch block modal pre-filled with project name
+  const p=projects.find(x=>x.id===detailProjId);
+  if(!p) return;
+  closeModal('detailOverlay');
+  // switch to schedule tab
+  document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
+  document.getElementById('page-schedule').classList.add('active');
+  document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('active'));
+  const schedTab=document.querySelectorAll('.ntab')[1];
+  if(schedTab) schedTab.classList.add('active');
+  renderSchedule();
+  openBlockModal(null,p.name);
+  // when scheduling from a project, default the block to a work period
+  document.getElementById('bm-type').value = 'workperiod';
+}
 
-function openBlockModal(id){
+// ── BLOCKS ────────────────────────────────────────────────────────────
+const bColors={routine:'#4a9eff',medical:'#e8a020',amish:'#3ecf8e',social:'#a78bfa',travel:'#e05252',mealprep:'#f97316',grocery:'#e879f9',personal:'#94a3b8',workperiod:'#4ecdc4'};
+
+function openBlockModal(id, defaultName){
+  // id = existing block id, defaultName = name for new block (e.g. project)
   editBlockId=id||null;
   const b=id?blocks.find(x=>x.id===id):null;
   document.getElementById('bm-title').textContent=b?'Edit Time Block':'New Time Block';
-  document.getElementById('bm-name').value=b?b.name:'';
+  document.getElementById('bm-name').value=b?b.name:(defaultName||'');
   document.getElementById('bm-type').value=b?b.type:'routine';
   document.getElementById('bm-date').value=b?b.date:dstr(viewDate);
   document.getElementById('bm-start').value=b?b.start:'08:00';
@@ -1011,7 +1033,19 @@ function blocksForDate(ds){
 }
 function shiftDay(n){viewDate=new Date(viewDate);viewDate.setDate(viewDate.getDate()+n);renderSchedule();}
 function goToday(){viewDate=new Date();renderSchedule();}
-function shiftWeek(n){weekOff+=n;renderMiniCal();renderUpcoming();}
+// navigates the mini-calendar by whole months instead of weeks
+function shiftMonth(n){
+  monthOff += n;
+  renderMiniCal();
+  renderUpcoming();
+}
+
+// keep week-based call around in case anything else uses it
+function shiftWeek(n){
+  monthOff += n;
+  renderMiniCal();
+  renderUpcoming();
+} 
 function selectDay(ds){viewDate=new Date(ds+'T12:00:00');renderSchedule();}
 function renderSchedule(){renderDayView();renderMiniCal();renderUpcoming();}
 
@@ -1022,12 +1056,23 @@ function renderDayView(){
   document.getElementById('dayTitle').textContent=DAYS[viewDate.getDay()]+', '+MONS[viewDate.getMonth()]+' '+viewDate.getDate();
   const isToday=ds===dstr(new Date());
   document.getElementById('daySub').textContent=isToday?'Today':viewDate.getFullYear();
+
   const dayBlocks=blocksForDate(ds);
   let busy=0;
-  dayBlocks.forEach(b=>{const[sh,sm]=b.start.split(':').map(Number),[eh,em]=b.end.split(':').map(Number);busy+=Math.max(0,(eh*60+em)-(sh*60+sm));});
-  const free=Math.max(0,16*60-busy),fh=Math.floor(free/60),fm=free%60;
+  // determine timeline bounds dynamically so early/late blocks show
+  let S=5,E=22;
+  dayBlocks.forEach(b=>{
+    const[sh,sm]=b.start.split(':').map(Number),[eh,em]=b.end.split(':').map(Number);
+    busy+=Math.max(0,(eh*60+em)-(sh*60+sm));
+    if(sh < S) S = sh;
+    if(eh > E) E = eh;
+  });
+  S = Math.max(0, S);
+  E = Math.min(24, E);
+
+  const free=Math.max(0,(E-S)*60-busy),fh=Math.floor(free/60),fm=free%60;
   document.getElementById('freeVal').textContent=fm>0?`${fh}h ${fm}m`:`${fh}h free`;
-  const S=5,E=22,tl=document.getElementById('timeline');
+  const tl=document.getElementById('timeline');
   tl.innerHTML='';
   if(isToday){
     const n=new Date();
@@ -1046,9 +1091,9 @@ function renderDayView(){
   dayBlocks.forEach(b=>{
     const[sh,sm]=b.start.split(':').map(Number),[eh,em]=b.end.split(':').map(Number);
     const start=sh*60+sm-S*60,dur=(eh*60+em)-(sh*60+sm);
-    if(dur<=0||start<0)return;
+    if(dur<=0) return; // start may be negative but clamped by S above
     const el=document.createElement('div');el.className='tl-block';
-    el.style.top=`calc(${start/total*100}% + 1px)`;
+    el.style.top=`calc(${Math.max(0,start)/total*100}% + 1px)`;
     el.style.height=`calc(${dur/total*100}% - 2px)`;
     el.style.background=b.color+'22';el.style.borderLeftColor=b.color;
     el.innerHTML=`<div class="tl-bname" style="color:${b.color}">${b.name}</div><div class="tl-btime" style="color:${b.color}">${b.start}–${b.end}${b.notes?' · '+b.notes:''}</div>`;
@@ -1058,7 +1103,9 @@ function renderDayView(){
 }
 
 function renderMiniCal(){
-  const today=new Date(),ref=new Date(today);ref.setDate(today.getDate()+weekOff*7);
+  const today=new Date();
+  const ref=new Date(today);
+  ref.setMonth(ref.getMonth()+monthOff);
   const y=ref.getFullYear(),mo=ref.getMonth();
   const MONS=['January','February','March','April','May','June','July','August','September','October','November','December'];
   document.getElementById('wtitle').textContent=MONS[mo]+' '+y;
@@ -1125,15 +1172,51 @@ function importData(input){
 
 // ── ICS IMPORT ────────────────────────────────────────────────────────
 function parseICSDate(str){
-  // Remove VALUE=DATE-TIME: prefix variants
-  const s=str.replace(/^[^:]+:/,'').trim();
-  const d=s.replace('Z','');
-  const yr=+d.slice(0,4),mo=+d.slice(4,6)-1,dy=+d.slice(6,8);
-  if(d.length===8) return null; // all-day, skip
-  const hr=+d.slice(9,11),mn=+d.slice(11,13),sc=+d.slice(13,15);
-  return s.endsWith('Z')
-    ? new Date(Date.UTC(yr,mo,dy,hr,mn,sc))
-    : new Date(yr,mo,dy,hr,mn,sc);
+  // normalize the value by stripping any prefix (TZID, VALUE, etc.)
+  let s = str.replace(/^[^:]+:/,'').trim();
+  // bare date (YYYYMMDD) is treated as an all-day event
+  if(/^[0-9]{8}$/.test(s)) return null;
+
+  // try a strict regex first (handles TZ offsets and trailing Z)
+  // examples: 20161210T090000, 20161210T090000Z, 20161210T090000-0500
+  const m = s.match(/^([0-9]{4})([0-9]{2})([0-9]{2})T([0-9]{2})([0-9]{2})([0-9]{2})(Z|[+-][0-9]{4})?$/);
+  if(m){
+    const [, y,mo,da,hr,mn,sc,off] = m;
+    let date;
+    if(off === 'Z'){
+      date = new Date(Date.UTC(+y,+mo-1,+da,+hr,+mn,+sc));
+    } else {
+      // local time or offset included
+      date = new Date(+y,+mo-1,+da,+hr,+mn,+sc);
+      if(off){
+        // apply offset to convert to local time
+        const sign = off[0] === '+' ? -1 : 1;
+        const offH = +off.slice(1,3);
+        const offM = +off.slice(3,5);
+        date = new Date(date.getTime() + sign * (offH*60 + offM) * 60000);
+      }
+    }
+    if(!isNaN(date)) return date;
+  }
+
+  // previous fallback: manual slicing (kept for backwards compatibility)
+  try{
+    const d = s.replace(/Z$/,'');
+    const yr = +d.slice(0,4), mo = +d.slice(4,6)-1, dy = +d.slice(6,8);
+    let hr = 0, mn = 0, sc = 0;
+    if(d.length>=11){ hr = +d.slice(9,11)||0; }
+    if(d.length>=13){ mn = +d.slice(11,13)||0; }
+    if(d.length>=15){ sc = +d.slice(13,15)||0; }
+    if(s.endsWith('Z')){
+      return new Date(Date.UTC(yr,mo,dy,hr,mn,sc));
+    }
+    const dt = new Date(yr,mo,dy,hr,mn,sc);
+    if(!isNaN(dt)) return dt;
+  }catch(_){ }
+
+  // final fallback: let JS try to parse whatever string is left
+  const dt2 = new Date(s);
+  return isNaN(dt2.getTime()) ? null : dt2;
 }
 function importICS(input){
   const file=input.files[0]; if(!file)return;
@@ -1145,8 +1228,9 @@ function importICS(input){
     const events=[];
     let ev=null;
     for(const line of lines){
-      if(line==='BEGIN:VEVENT'){ev={};continue;}
-      if(line==='END:VEVENT'){if(ev)events.push(ev);ev=null;continue;}
+      const u=line.toUpperCase();
+      if(u.startsWith('BEGIN:VEVENT')){ev={};continue;}
+      if(u.startsWith('END:VEVENT')){if(ev)events.push(ev);ev=null;continue;}
       if(!ev)continue;
       const colon=line.indexOf(':');
       if(colon<0)continue;
@@ -1158,32 +1242,115 @@ function importICS(input){
       else if(key==='DESCRIPTION')ev.desc=val.replace(/\\n/g,' ').replace(/\\,/g,',');
       else if(key==='LOCATION')ev.loc=val.replace(/\\,/g,',');
     }
-    let added=0,skipped=0;
+    // debug info - keep for now
+    console.log('ICS parsed events:', events);
+    alert(events.length+' events found in file');
+    let added=0,skipped=0,allDay=0;
     const newBlocks=[];
     for(const ev of events){
-      if(!ev.start||!ev.summary)continue;
-      const start=parseICSDate(ev.start);
-      if(!start){skipped++;continue;} // all-day
-      const end=ev.end?parseICSDate(ev.end):null;
+      if(!ev.start||!ev.summary) continue;
+      const dt=parseICSDate(ev.start);
+      // diagnostic logging for troubleshooting
+      console.log('parsing ICS event', ev.start, '->', dt);
       const pad=n=>String(n).padStart(2,'0');
-      const dateStr=`${start.getFullYear()}-${pad(start.getMonth()+1)}-${pad(start.getDate())}`;
-      const startTime=`${pad(start.getHours())}:${pad(start.getMinutes())}`;
-      const endTime=end?`${pad(end.getHours())}:${pad(end.getMinutes())}`:'';
+      let dateStr, startTime, endTime;
+      if(!dt){
+        // treat as all-day YYYYMMDD event
+        const s=ev.start.replace(/^[^:]+:/,'').trim();
+        if(/^[0-9]{8}$/.test(s)){
+          allDay++;
+          const yr=+s.slice(0,4),mo=+s.slice(4,6)-1,dy=+s.slice(6,8);
+          dateStr=`${yr}-${pad(mo+1)}-${pad(dy)}`;
+          startTime='00:00';
+          endTime='23:59';
+        } else {
+          skipped++;
+          console.warn('skipping unparsable ICS start value', s);
+          continue;
+        }
+      } else {
+        const end=ev.end?parseICSDate(ev.end):null;
+        dateStr=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
+        startTime=`${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+        endTime=end?`${pad(end.getHours())}:${pad(end.getMinutes())}`:startTime;
+      }
       const notes=[ev.desc,ev.loc?'📍 '+ev.loc:''].filter(Boolean).join(' | ');
+      const type='personal';
       newBlocks.push({
         id:crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2),
-        date:dateStr,startTime,endTime,
-        label:ev.summary,
-        projectId:'',
-        notes
+        name:ev.summary,
+        type:type,
+        date:dateStr,
+        start:startTime,
+        end:endTime,
+        notes:notes,
+        recur:'none',
+        dows:[],
+        color:bColors[type]||'#94a3b8'
       });
       added++;
     }
-    if(added===0){alert('No timed events found in this file.'+(skipped?' ('+skipped+' all-day events skipped.)':''));input.value='';return;}
-    if(!confirm('Add '+added+' calendar event'+(added>1?'s':'')+' as time blocks?'+(skipped?' ('+skipped+' all-day events skipped)':'')))return;
+    if(added===0 && allDay>0){
+      // automatically import pure all-day files
+      blocks.push(...newBlocks);
+      save();renderSchedule();
+      alert(allDay+' all-day event'+(allDay>1?'s':'')+' imported.');
+      input.value='';
+      return;
+    }
+    if(added===0){
+      let msg;
+      if(allDay>0){
+        msg = 'No events with specific times found; ' +
+              allDay + ' all-day event' + (allDay>1?'s':'');
+        if(skipped) msg += ' and ' + skipped + ' unparsable entr' +
+                       (skipped>1?'ies':'y');
+        msg += '.';
+      } else {
+        msg = 'No timed events found in this file' +
+              (skipped?` (${skipped} unparsable entr${skipped>1?'ies':'y'})`:'') +
+              '.';
+      }
+      alert(msg);
+      input.value='';
+      return;
+    }
+    // user approval for timed events (and any mix)
+    if(!confirm('Add '+added+' calendar event'+(added>1?'s':'')+' as time blocks?'+
+               (allDay?` (${allDay} all-day)`:'')+
+               (skipped?' ('+skipped+' unparsable)':'')))return;
     blocks.push(...newBlocks);
-    save();renderSchedule();
-    alert(added+' event'+(added>1?'s':'')+' imported.');
+    save();
+    // if we imported anything, move viewDate to earliest new block — but only if it's in a reasonable range
+    // (ignore very old recurring events like birthdays from decades ago)
+    if(newBlocks.length){
+      const today=new Date();
+      const minDate=new Date(today.getFullYear()-1,today.getMonth(),today.getDate()); // 1 year ago
+      const maxDate=new Date(today.getFullYear()+5,today.getMonth(),today.getDate()); // 5 years ahead
+      const reasonableBlocks=newBlocks.filter(b=>{
+        const d=new Date(b.date+'T12:00:00');
+        return d>=minDate && d<=maxDate;
+      });
+      if(reasonableBlocks.length){
+        reasonableBlocks.sort((a,b)=>a.date.localeCompare(b.date));
+        viewDate=new Date(reasonableBlocks[0].date+'T12:00:00');
+        monthOff = (viewDate.getFullYear()-today.getFullYear())*12 + (viewDate.getMonth()-today.getMonth());
+      } else {
+        // all blocks are far in the past/future; just stay on today
+        monthOff = 0;
+        // give user a hint so they know why nothing appeared
+        alert('Imported events are all outside the next few years. Make sure you exported the correct calendar.');
+      }
+    } else {
+      // return to current month if nothing new
+      monthOff = 0;
+    }
+    renderSchedule();
+    renderMiniCal();
+    let resultMsg = added + ' event' + (added>1?'s':'') + ' imported.';
+    if(allDay) resultMsg += ' ('+allDay+' all-day)';
+    if(skipped) resultMsg += ' '+skipped+' skipped.';
+    alert(resultMsg);
   };
   reader.readAsText(file);
   input.value='';
